@@ -15,4 +15,5 @@ profile
 *.moved-aside
 DerivedData
 .idea/
-obj/run
+obj/
+run

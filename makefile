@@ -1,18 +1,24 @@
 CC=g++
 CFLAGS=-c -Wall
 LDFLAGS=
+OBJDIR=$(CURDIR)/obj
 SOURCES=$(wildcard src/*.cpp)
-#OBJECTS=$(SOURCES:.cpp=.o)
-OBJECTS=$(addprefix obj/,$(notdir $(SOURCES:.cpp=.o)))
+OBJECTS=$(addprefix $(OBJDIR)/,$(notdir $(SOURCES:.cpp=.o)))
 EXECUTABLE=run
 
 all: $(SOURCES) $(EXECUTABLE)
-	
-$(EXECUTABLE): $(OBJECTS) 
+
+$(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-obj/%.o: src/%.cpp
+$(OBJDIR)/%.o: src/%.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf obj/*.o run $(EXECUTABLE)
+	rm -rf $(OBJDIR)/*.o $(EXECUTABLE)
+
+$(OBJECTS) : | $(OBJDIR)
+
+$(OBJDIR):
+	test -d $(OBJDIR) || mkdir $(OBJDIR)
+
