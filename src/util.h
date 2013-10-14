@@ -25,7 +25,7 @@ void read(const char *fileName, float *a, int n)
 	fclose(f);
 }
 
-class SampleReader
+class RandomSampleReader
 {
     FILE **f;
     
@@ -34,13 +34,13 @@ class SampleReader
     int curInd;
     
 public:
-    ~SampleReader()
+    ~RandomSampleReader()
     {
         for(int i = 0; i < k; ++i)
             fclose(f[i]);
     }
 
-    SampleReader(int n, const char **fileNames, int k)
+    RandomSampleReader(int n, const char **fileNames, int k)
     {
         this->k = k;
         f = new FILE*[k];

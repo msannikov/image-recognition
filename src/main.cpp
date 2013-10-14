@@ -276,7 +276,7 @@ void getInputLayer(float *inputLayer, FILE *f)
 
 void makeStudyIteration(float *w[4], float *x[5], float &error)
 {
-    SampleReader reader(STUDYN, dataFileName, 10);
+    RandomSampleReader reader(STUDYN, dataFileName, 10);
     
     for(int i = 0; i < STUDYN * 10; ++i)
     {
@@ -316,10 +316,10 @@ void initArrays(float *w[4], float *x[5], bool studying = 1)
     }
     else
     {
-        read("lw1.wei", w[0], 156);
-        read("lw2.wei", w[1], 7800);
-        read("lw3.wei", w[2], 125100);
-        read("lw4.wei", w[3], 1010);
+        read("weights/weight1", w[0], 156);
+        read("weights/weight2", w[1], 7800);
+        read("weights/weight3", w[2], 125100);
+        read("weights/weight4", w[3], 1010);
     }
     
     x[0] = new float[841];
@@ -361,10 +361,10 @@ void study()
         startTime = clock();
     }
     
-    print("lw1.wei", w[0], 156);
-    print("lw2.wei", w[1], 7800);
-    print("lw3.wei", w[2], 125100);
-    print("lw4.wei", w[3], 1010);
+    print("weight1", w[0], 156);
+    print("weight2", w[1], 7800);
+    print("weight3", w[2], 125100);
+    print("weight4", w[3], 1010);
 }
 
 //---------------------------------------------------------------------------
@@ -413,8 +413,8 @@ int main()
 	cerr << fixed;
     
     //-----------
-    //study();
-    //return 0;
+    study();
+    return 0;
     //------------
 
 	int n = 1000;
