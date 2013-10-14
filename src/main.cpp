@@ -2,9 +2,9 @@
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
-const float EPS = 1e-5;
+const float EPS = 1e-9;
 const int STUDYN = 200;
-const float ETA = 0.05;
+float ETA = 0.005;
 //---------------------------------------------------------------------------
 
 int k1[25] = {0, 1, 2, 3, 4,
@@ -102,7 +102,7 @@ void calculate(float *w[4], float *x[5])
 }
 //------------------------------------------------------------
 
-void calcNeuronError(float *x[5], float *w[4], float *y, float *neuronError[5])
+void calcNeuronErrors(float *x[5], float *w[4], float *y, float *neuronError[5])
 {
     for(int i = 0; i < 10; ++i)
         neuronError[4][i] = df(x[4][i]) * (x[4][i] - y[i]);
@@ -163,8 +163,6 @@ void calcNeuronError(float *x[5], float *w[4], float *y, float *neuronError[5])
 	}
     for(int i = 0; i < 841; ++i)
         neuronError[0][i] *= df(x[0][i]);
-    
-    //cerr << neuronError[4][2] << endl; //!!! too same
 }
 
 void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
@@ -252,8 +250,7 @@ void backpropagate(float *w[4], float *x[5], float *y)
     memset(neuronError[3], 0, sizeof(float) * 100);
     memset(neuronError[4], 0, sizeof(float) * 10);
     
-    calcNeuronError(x, w, y, neuronError);
-    
+    calcNeuronErrors(x, w, y, neuronError);
     calcNewWeights(w, x, neuronError);
 }
 
@@ -306,10 +303,7 @@ void makeStudyIteration(float *w[4], float *x[5], float &error)
 void initWeights(float *w, int n)
 {
     for(int i = 0; i < n; ++i)
-    {
-        w[i] = (rand() * 1. / RAND_MAX);
-        //w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1);
-    }
+        w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 10;
 }
 
 void initArrays(float *w[4], float *x[5])
@@ -340,11 +334,14 @@ void study()
     
     float lastError = 1e20;
     
-    int step = 0;
+    int step = 1;
     clock_t startTime = clock();
     
     for(;; ++step)
     {
+        if(!(step % 60))
+            ETA *= 0.3;
+        
         float curError;
         
         makeStudyIteration(w, x, curError);
@@ -386,13 +383,18 @@ int getResult(float output[10])
 void test(const char *fileName, int expectedResult, int n)
 {
 	FILE *f = fopen(fileName, "rb");
-	int q = 0;
+	int rightResultCount = 0;
     
     float *w[4];
     w[0] = new float[156];
     w[1] = new float[7800];
     w[2] = new float[125100];
     w[3] = new float[1010];
+    
+    read("lw1.wei", w[0], 156);
+    read("lw2.wei", w[1], 7800);
+    read("lw3.wei", w[2], 125100);
+    read("lw4.wei", w[3], 1010);
     
     float *x[5];
     x[0] = new float[841];
@@ -403,27 +405,14 @@ void test(const char *fileName, int expectedResult, int n)
     
 	for(int image = 0; image < n; ++image)
 	{
-		uchar a[29][29];
-		memset(a, 0, sizeof a);
-		for(int i = 0; i < 28; ++i)
-			fread(&a[i], sizeof(uchar), 28, f);
-        
-		for(int i = 0; i < 29; ++i)
-			for(int j = 0; j < 29; ++j)
-				x[0][29 * i + j] = a[i][j] ? 0 : 1;
-        
-        read("lw1.wei", w[0], 156);
-        read("lw2.wei", w[1], 7800);
-        read("lw3.wei", w[2], 125100);
-        read("lw4.wei", w[3], 1010);
-        
+        getInputLayer(x[0], f);
 		calculate(w, x);
-		
 		int result = getResult(x[4]);
         
-		if(result == expectedResult) ++q;
-	}
-	cerr << fileName << " : " << q << endl;
+		if(result == expectedResult)
+            ++rightResultCount;
+    }
+	cerr << fileName << " : " << rightResultCount << endl;
 	fclose(f);
 }
 
