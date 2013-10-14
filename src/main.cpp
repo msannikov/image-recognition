@@ -102,7 +102,7 @@ void calculate(float *w[4], float *x[5])
 }
 //------------------------------------------------------------
 
-void calcNeuronErrors(float *x[5], float *w[4], float *y, float *neuronError[5])
+void calcNeuronErrors(float *w[5], float *x[4], float *y, float *neuronError[5])
 {
     for(int i = 0; i < 10; ++i)
         neuronError[4][i] = df(x[4][i]) * (x[4][i] - y[i]);
@@ -250,7 +250,7 @@ void backpropagate(float *w[4], float *x[5], float *y)
     memset(neuronError[3], 0, sizeof(float) * 100);
     memset(neuronError[4], 0, sizeof(float) * 10);
     
-    calcNeuronErrors(x, w, y, neuronError);
+    calcNeuronErrors(w, x, y, neuronError);
     calcNewWeights(w, x, neuronError);
 }
 
@@ -276,26 +276,21 @@ void getInputLayer(float *inputLayer, FILE *f)
 
 void makeStudyIteration(float *w[4], float *x[5], float &error)
 {
-    for(int fileInd = 0; fileInd < 10; ++fileInd) // todo: write class Reader
+    SampleReader reader(STUDYN, dataFileName, 10);
+    
+    for(int i = 0; i < STUDYN * 10; ++i)
     {
-        FILE *f = fopen(dataFileName[fileInd], "rb");
+        int expectedDigit = reader.getNextSample(x[0]);
         
         float y[10];
         for(int i = 0; i < 10; ++i)
-            y[i] = i == fileInd ? 0.95 : -0.95;
+            y[i] = i == expectedDigit ? 0.95 : -0.95;
+
+        calculate(w, x);
         
-        for(int imageInd = 0; imageInd < STUDYN; ++imageInd)
-        {
-            getInputLayer(x[0], f);
-            
-            calculate(w, x);
-            
-            error += getNetError(x[4], 10, y);
-            
-            backpropagate(w, x, y);
-        }
+        error += getNetError(x[4], 10, y);
         
-        fclose(f);
+        backpropagate(w, x, y);
     }
 }
 
@@ -418,15 +413,13 @@ int main()
 	cerr << fixed;
     
     //-----------
-    study();
-    return 0;
+    //study();
+    //return 0;
     //------------
 
-    clock_t t = clock();
-	int n = 100;
+	int n = 1000;
     for(int i = 0; i < 10; ++i)
         test(dataFileName[i], i, n);
-	cerr << double(clock() - t) / CLOCKS_PER_SEC / n / 10 << endl;
     
 	return 0;
 }
