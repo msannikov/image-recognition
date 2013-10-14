@@ -2,7 +2,7 @@
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
-const float EPS = 1e-9;
+const float EPS = 1e-4;
 const int STUDYN = 200;
 float ETA = 0.005;
 //---------------------------------------------------------------------------
@@ -276,7 +276,6 @@ void getInputLayer(float *inputLayer, FILE *f)
 
 void makeStudyIteration(float *w[4], float *x[5], float &error)
 {
-    error = 0;
     for(int fileInd = 0; fileInd < 10; ++fileInd) // todo: write class Reader
     {
         FILE *f = fopen(dataFileName[fileInd], "rb");
@@ -303,20 +302,30 @@ void makeStudyIteration(float *w[4], float *x[5], float &error)
 void initWeights(float *w, int n)
 {
     for(int i = 0; i < n; ++i)
-        w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 10;
+        w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 100;
 }
 
-void initArrays(float *w[4], float *x[5])
+void initArrays(float *w[4], float *x[5], bool studying = 1)
 {
     w[0] = new float[156];
     w[1] = new float[7800];
     w[2] = new float[125100];
     w[3] = new float[1010];
     
-    initWeights(w[0], 156);
-    initWeights(w[1], 7800);
-    initWeights(w[2], 125100);
-    initWeights(w[3], 1010);
+    if(studying)
+    {
+        initWeights(w[0], 156);
+        initWeights(w[1], 7800);
+        initWeights(w[2], 125100);
+        initWeights(w[3], 1010);
+    }
+    else
+    {
+        read("lw1.wei", w[0], 156);
+        read("lw2.wei", w[1], 7800);
+        read("lw3.wei", w[2], 125100);
+        read("lw4.wei", w[3], 1010);
+    }
     
     x[0] = new float[841];
     x[1] = new float[1014];
@@ -339,10 +348,10 @@ void study()
     
     for(;; ++step)
     {
-        if(!(step % 60))
-            ETA *= 0.3;
+        //if(!(step % 60))
+        //    ETA *= 0.3;
         
-        float curError;
+        float curError = 0;
         
         makeStudyIteration(w, x, curError);
         
@@ -386,23 +395,10 @@ void test(const char *fileName, int expectedResult, int n)
 	int rightResultCount = 0;
     
     float *w[4];
-    w[0] = new float[156];
-    w[1] = new float[7800];
-    w[2] = new float[125100];
-    w[3] = new float[1010];
-    
-    read("lw1.wei", w[0], 156);
-    read("lw2.wei", w[1], 7800);
-    read("lw3.wei", w[2], 125100);
-    read("lw4.wei", w[3], 1010);
-    
     float *x[5];
-    x[0] = new float[841];
-    x[1] = new float[1014];
-    x[2] = new float[1250];
-    x[3] = new float[100];
-    x[4] = new float[10];
-    
+
+    initArrays(w, x, 0);
+
 	for(int image = 0; image < n; ++image)
 	{
         getInputLayer(x[0], f);
@@ -425,7 +421,7 @@ int main()
     study();
     return 0;
     //------------
-	
+
     clock_t t = clock();
 	int n = 100;
     for(int i = 0; i < 10; ++i)
