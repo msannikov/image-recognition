@@ -1,4 +1,5 @@
 #include "util.h"
+//#include <omp.h>
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
@@ -71,13 +72,20 @@ void exec2(float *neur2, float *w2, float *neur3)
 
 void exec3(float *neur3, float *w3, float *neur4)
 {
-	for(int tmap = 0; tmap < 100; ++tmap)
-	{
-		int ind = tmap * 1251;
-		float res = w3[ind++];
-		for(int i = 0; i < 1250; ++i, ++ind)
-			res += neur3[i] * w3[ind];
-		neur4[tmap] = f(res);
+    //omp_set_dynamic(0);
+    //omp_set_num_threads(100);
+    
+    //#pragma omp parallel shared(neur3, w3, neur) private(tmap)
+    {
+        //#pragma omp for
+        for(int tmap = 0; tmap < 100; ++tmap)
+        {
+            int ind = tmap * 1251;
+            float res = w3[ind++];
+            for(int i = 0; i < 1250; ++i, ++ind)
+                res += neur3[i] * w3[ind];
+            neur4[tmap] = f(res);
+        }
 	}
 }
 
@@ -413,8 +421,8 @@ int main()
 	cerr << fixed;
     
     //-----------
-    study();
-    return 0;
+    //study();
+    //return 0;
     //------------
 
 	int n = 1000;
