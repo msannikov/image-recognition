@@ -2,9 +2,9 @@
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
-const float EPS = 1e-4;
-const int STUDYN = 200;
-float ETA = 0.005;
+const float EPS = 1e-7;
+const int STUDYN = 400;
+float ETA = 0.003;
 //---------------------------------------------------------------------------
 
 int k1[25] = {0, 1, 2, 3, 4,
@@ -343,8 +343,8 @@ void study()
     
     for(;; ++step)
     {
-        //if(!(step % 60))
-        //    ETA *= 0.3;
+        if(!(step % 30))
+            ETA *= 0.3;
         
         float curError = 0;
         
