@@ -1,5 +1,6 @@
 #include "util.h"
 //#include <omp.h>
+#include <pthread.h>
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
@@ -70,23 +71,60 @@ void exec2(float *neur2, float *w2, float *neur3)
 	}
 }
 
+float *n3, *weight3, *n4;
+
+void *execThreadOfLayer3(void *threadArg)
+{
+    int tmap = 50 * (*((int*)threadArg));
+    
+    for(int k = 0; k < 50; ++k, ++tmap)
+    {
+        int ind = tmap * 1251;
+        
+        float res = weight3[ind++];
+        
+        for(int i = 0; i < 1250; ++i, ++ind)
+            res += n3[i] * weight3[ind];
+        
+        n4[tmap] = f(res);
+    }
+}
+
+int threadArgs[5] = {0, 1, 2, 3, 4};
+pthread_t threads[5];
+
 void exec3(float *neur3, float *w3, float *neur4)
 {
-    //omp_set_dynamic(0);
-    //omp_set_num_threads(100);
+    n3 = neur3;
+    weight3 = w3;
+    n4 = neur4;
     
-    //#pragma omp parallel shared(neur3, w3, neur) private(tmap)
+    clock_t start = clock();
+    
+    pthread_create(&threads[0], NULL, execThreadOfLayer3, &threadArgs[0]);
+    pthread_create(&threads[1], NULL, execThreadOfLayer3, &threadArgs[1]);
+    //pthread_create(&threads[2], NULL, execThreadOfLayer3, &threadArgs[2]);
+    //pthread_create(&threads[3], NULL, execThreadOfLayer3, &threadArgs[3]);
+    //pthread_create(&threads[4], NULL, execThreadOfLayer3, &threadArgs[4]);
+    
+    for(int i = 0; i < 2; ++i)
+        pthread_join(threads[i], NULL);
+    
+    cerr << "several threads time : " << (clock() - start) * 1. / CLOCKS_PER_SEC << endl;
+    
+    /*
+    clock_t start = clock();
+    
+    for(int tmap = 0; tmap < 100; ++tmap)
     {
-        //#pragma omp for
-        for(int tmap = 0; tmap < 100; ++tmap)
-        {
-            int ind = tmap * 1251;
-            float res = w3[ind++];
-            for(int i = 0; i < 1250; ++i, ++ind)
-                res += neur3[i] * w3[ind];
-            neur4[tmap] = f(res);
-        }
+        int ind = tmap * 1251;
+        float res = w3[ind++];
+        for(int i = 0; i < 1250; ++i, ++ind)
+            res += neur3[i] * w3[ind];
+        neur4[tmap] = f(res);
 	}
+    
+    cerr << "one threads time : " << (clock() - start) * 1. / CLOCKS_PER_SEC << endl;*/
 }
 
 void exec4(float *neur4, float *w4, float *neur5)
@@ -267,7 +305,7 @@ float getNetError(float *output, int size, float *y)
     float res = 0;
     for(int i = 0; i < size; ++i)
         res += sqr(output[i] - y[i]);
-    return res / size;
+    return res / 2; //res / size;
 }
 
 void getInputLayer(float *inputLayer, FILE *f)
@@ -351,8 +389,8 @@ void study()
     
     for(;; ++step)
     {
-        if(!(step % 30))
-            ETA *= 0.3;
+        //if(!(step % 30))
+        //    ETA *= 0.3;
         
         float curError = 0;
         
@@ -421,8 +459,8 @@ int main()
 	cerr << fixed;
     
     //-----------
-    //study();
-    //return 0;
+    study();
+    return 0;
     //------------
 
 	int n = 1000;
