@@ -1,13 +1,13 @@
 #include "util.h"
 //#include <omp.h>
-#include <pthread.h>
 
 const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
 const float EPS = 1e-7;
-const int STUDYN = 400;
-const float ALPHA = 0.0001;
-const float ETA = 0.003;
+const int STUDYN = 700;
+float ETA = 0.003;
+//const int STUDYN = 400;
+//float ETA = 0.08;
 //---------------------------------------------------------------------------
 
 int k1[25] = {0, 1, 2, 3, 4,
@@ -25,11 +25,13 @@ int k2[25] = {0, 1, 2, 3, 4,
 float f(float s)
 {
     return 1.7159 * tanhf(0.66666667 * s);
+    //return 1. / (1 + exp(-s));
 }
 
 float df(float s)
 {
     return 1.7159 * 0.66666667 * (1. - sqr(0.66666667 * s));
+    //return s * (1. - s);
 }
 
 void exec1(float *neur1, float *w1, float *neur2)
@@ -81,7 +83,7 @@ void exec3(float *neur3, float *w3, float *neur4)
         for(int i = 0; i < 1250; ++i, ++ind)
             res += neur3[i] * w3[ind];
         neur4[tmap] = f(res);
-	}
+    }
 }
 
 void exec4(float *neur4, float *w4, float *neur5)
@@ -168,7 +170,7 @@ void calcNeuronErrors(float *w[5], float *x[4], float *y, float *neuronError[5])
         neuronError[0][i] *= df(x[0][i]);
 }
 
-void calcNewWeights(float *w[4], float *prevw[5], float *neur[5], float *neuronError[5])
+void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
 {
     for(int tmap = 0; tmap < 6; ++tmap)
 	{
@@ -179,14 +181,11 @@ void calcNewWeights(float *w[4], float *prevw[5], float *neur[5], float *neuronE
                 float curError = neuronError[1][169 * tmap + y * 13 + x];
                 
 				int ind = tmap * 26;
-                w[0][ind] += -ETA * curError; // bias : using acceleration? ALPHA?
+                w[0][ind] += -ETA * curError; // bias
                 ++ind;
                 
 				for(int i = 0; i < 25; ++i, ++ind)
-                {
-                    w[0][ind] += -ETA * curError * neur[0][2 * 29 * y + 2 * x + k1[i]] +
-                                    ALPHA * (w[0][ind] - prevw[0][ind]);
-                }
+                    w[0][ind] += -ETA * curError * neur[0][2 * 29 * y + 2 * x + k1[i]];
 			}
 		}
 	}
@@ -208,8 +207,7 @@ void calcNewWeights(float *w[4], float *prevw[5], float *neur[5], float *neuronE
                     for(int j = 0; j < 6; ++j)
                     {
                         w[1][ind + i * 6 + j] += -ETA * curError *
-                            neur[1][13 * 13 * j + 2 * x + 13 * 2 * y + k2[i]] +
-                            ALPHA * (w[1][ind + i * 6 + j] - prevw[1][ind + i * 6 + j]);
+                        neur[1][13 * 13 * j + 2 * x + 13 * 2 * y + k2[i]];
                     }
                 }
 			}
@@ -225,8 +223,7 @@ void calcNewWeights(float *w[4], float *prevw[5], float *neur[5], float *neuronE
         ++ind;
         
 		for(int i = 0; i < 1250; ++i, ++ind)
-            w[2][ind] += -ETA * curError * neur[2][i] +
-                         ALPHA * (w[2][ind] - prevw[2][ind]);
+            w[2][ind] += -ETA * curError * neur[2][i];
 	}
     
     for(int tmap = 0; tmap < 10; ++tmap)
@@ -238,12 +235,11 @@ void calcNewWeights(float *w[4], float *prevw[5], float *neur[5], float *neuronE
         ++ind;
         
 		for(int i = 0; i < 100; ++i, ++ind)
-            w[3][ind] += -ETA * curError * neur[3][i] +
-                            ALPHA * (w[3][ind] - prevw[3][ind]);
+            w[3][ind] += -ETA * curError * neur[3][i];
 	}
 }
 
-void backpropagate(float *w[4], float *prevw[4], float *x[5], float *y)
+void backpropagate(float *w[4], float *x[5], float *y)
 {
     float *neuronError[5];
     
@@ -260,7 +256,7 @@ void backpropagate(float *w[4], float *prevw[4], float *x[5], float *y)
     memset(neuronError[4], 0, sizeof(float) * 10);
     
     calcNeuronErrors(w, x, y, neuronError);
-    calcNewWeights(w, prevw, x, neuronError);
+    calcNewWeights(w, x, neuronError);
 }
 
 float getNetError(float *output, int size, float *y)
@@ -283,16 +279,9 @@ void getInputLayer(float *inputLayer, FILE *f)
             inputLayer[29 * i + j] = a[i][j] ? 0 : 1;
 }
 
-void makeStudyIteration(float *w[2][4], float *x[5], float &error)
+void makeStudyIteration(float *w[4], float *x[5], float &error)
 {
     RandomSampleReader reader(STUDYN, dataFileName, 10);
-    
-    
-    float *tmp[4];
-    tmp[0] = new float[156];
-    tmp[1] = new float[7800];
-    tmp[2] = new float[125100];
-    tmp[3] = new float[1010];
     
     for(int i = 0; i < STUDYN * 10; ++i)
     {
@@ -301,22 +290,13 @@ void makeStudyIteration(float *w[2][4], float *x[5], float &error)
         float y[10];
         for(int i = 0; i < 10; ++i)
             y[i] = i == expectedDigit ? 0.95 : -0.95;
+            //y[i] = i == expectedDigit ? 0.95 : 0.05;
 
-        calculate(w[0], x);
+        calculate(w, x);
         
         error += getNetError(x[4], 10, y);
         
-        memcpy(tmp[0], w[0][0], sizeof(float) * 156);
-        memcpy(tmp[1], w[0][1], sizeof(float) * 7800);
-        memcpy(tmp[2], w[0][2], sizeof(float) * 125100);
-        memcpy(tmp[3], w[0][3], sizeof(float) * 1010);
-        
-        backpropagate(w[0], w[1], x, y);
-        
-        memcpy(w[1][0], tmp[0], sizeof(float) * 156);
-        memcpy(w[1][1], tmp[1], sizeof(float) * 7800);
-        memcpy(w[1][2], tmp[2], sizeof(float) * 125100);
-        memcpy(w[1][3], tmp[3], sizeof(float) * 1010);
+        backpropagate(w, x, y);
     }
 }
 
@@ -326,31 +306,28 @@ void initWeights(float *w, int n)
         w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 100;
 }
 
-void initArrays(float *w[2][4], float *x[5])
+void initArrays(float *w[4], float *x[5], bool studying = 1)
 {
-    for(int i = 0; i < 2; ++i)
+    w[0] = new float[156];
+    w[1] = new float[7800];
+    w[2] = new float[125100];
+    w[3] = new float[1010];
+    
+    if(studying)
     {
-        w[i][0] = new float[156];
-        w[i][1] = new float[7800];
-        w[i][2] = new float[125100];
-        w[i][3] = new float[1010];
+        initWeights(w[0], 156);
+        initWeights(w[1], 7800);
+        initWeights(w[2], 125100);
+        initWeights(w[3], 1010);
+    }
+    else
+    {
+        read("weights/weight1", w[0], 156);
+        read("weights/weight2", w[1], 7800);
+        read("weights/weight3", w[2], 125100);
+        read("weights/weight4", w[3], 1010);
     }
     
-    initWeights(w[0][0], 156);
-    initWeights(w[0][1], 7800);
-    initWeights(w[0][2], 125100);
-    initWeights(w[0][3], 1010);
-    
-    memcpy(w[1][0], w[0][0], sizeof(float) * 156);
-    memcpy(w[1][1], w[0][1], sizeof(float) * 7800);
-    memcpy(w[1][2], w[0][2], sizeof(float) * 125100);
-    memcpy(w[1][3], w[0][3], sizeof(float) * 1010);
-    
-    memset(w[1][0], 0, sizeof(float) * 156);
-    memset(w[1][1], 0, sizeof(float) * 7800);
-    memset(w[1][2], 0, sizeof(float) * 125100);
-    memset(w[1][3], 0, sizeof(float) * 1010);
-        
     x[0] = new float[841];
     x[1] = new float[1014];
     x[2] = new float[1250];
@@ -360,7 +337,7 @@ void initArrays(float *w[2][4], float *x[5])
 
 void study()
 {
-    float *w[2][4];
+    float *w[4];
     float *x[5];
     
     initArrays(w, x);
@@ -372,6 +349,9 @@ void study()
     
     for(;; ++step)
     {
+        //if(!(step % 30))
+        //    ETA *= 0.3;
+        
         float curError = 0;
         
         makeStudyIteration(w, x, curError);
@@ -387,10 +367,10 @@ void study()
         startTime = clock();
     }
     
-    print("weight1", w[0][0], 156);
-    print("weight2", w[0][1], 7800);
-    print("weight3", w[0][2], 125100);
-    print("weight4", w[0][3], 1010);
+    print("weight1", w[0], 156);
+    print("weight2", w[1], 7800);
+    print("weight3", w[2], 125100);
+    print("weight4", w[3], 1010);
 }
 
 //---------------------------------------------------------------------------
@@ -410,7 +390,7 @@ int getResult(float output[10])
     return res;
 }
 
-/*void test(const char *fileName, int expectedResult, int n)
+void test(const char *fileName, int expectedResult, int n)
 {
 	FILE *f = fopen(fileName, "rb");
 	int rightResultCount = 0;
@@ -431,7 +411,7 @@ int getResult(float output[10])
     }
 	cerr << fileName << " : " << rightResultCount << endl;
 	fclose(f);
-}*/
+}
 
 int main()
 {
@@ -443,9 +423,9 @@ int main()
     return 0;
     //------------
 
-	/*int n = 1000;
+	int n = 1000;
     for(int i = 0; i < 10; ++i)
-        test(dataFileName[i], i, n);*/
+        test(dataFileName[i], i, n);
     
 	return 0;
 }
