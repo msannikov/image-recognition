@@ -25,52 +25,41 @@ void read(const char *fileName, float *a, int n)
 	fclose(f);
 }
 
-class RandomSampleReader
+class MNISTSampleReader
 {
-    FILE **f;
-    
-    int k;
-    vector<int> sequence;
-    int curInd;
+    FILE *imagesFile;
+    FILE *labelsFile;
     
 public:
-    ~RandomSampleReader()
+    ~MNISTSampleReader()
     {
-        for(int i = 0; i < k; ++i)
-            fclose(f[i]);
+        fclose(imagesFile);
+        fclose(labelsFile);
     }
-
-    RandomSampleReader(int n, const char **fileNames, int k)
+    
+    MNISTSampleReader(const char *imagesFileName, const char *labelsFileName)
     {
-        this->k = k;
-        f = new FILE*[k];
-        for(int i = 0; i < k; ++i)
-            f[i] = fopen(fileNames[i], "rb");
-        sequence.resize(k * n);
-        for(int i = 0; i < k; ++i)
-        {
-            for(int j = 0; j < n; ++j)
-                sequence[i * n + j] = i;
-        }
-        srand(4231121);
-        random_shuffle(sequence.begin(), sequence.end());
+        imagesFile = fopen(imagesFileName, "rb");
+        labelsFile = fopen(labelsFileName, "rb");
         
-        curInd = 0;
+        fseek(labelsFile, 8, SEEK_SET);
+        fseek(imagesFile, 16, SEEK_SET);
     }
     
     int getNextSample(float *inputLayer)
     {
-        int curFileInd = sequence[curInd++];
-        
         uchar a[29][29];
         memset(a, 0, sizeof a);
         for(int i = 0; i < 28; ++i)
-            fread(&a[i], sizeof(uchar), 28, f[curFileInd]);
+            fread(&a[i], sizeof(uchar), 28, imagesFile);
         
         for(int i = 0; i < 29; ++i)
             for(int j = 0; j < 29; ++j)
                 inputLayer[29 * i + j] = a[i][j] ? 0 : 1;
-
-        return curFileInd;
+        
+        uchar label;
+        fread(&label, sizeof(uchar), 1, labelsFile);
+        
+        return label;
     }
 };

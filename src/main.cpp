@@ -1,12 +1,7 @@
 #include "util.h"
-//#include <omp.h>
-
-const char *dataFileName[10] = {"data/data0", "data/data1", "data/data2", "data/data3", "data/data4", "data/data5", "data/data6", "data/data7", "data/data8", "data/data9"};
 
 const float EPS = 1e-7;
-const int STUDYN = 700;
-float ETA = 0.003;
-//const int STUDYN = 400;
+float ETA = 0.002;
 //float ETA = 0.08;
 //---------------------------------------------------------------------------
 
@@ -264,7 +259,7 @@ float getNetError(float *output, int size, float *y)
     float res = 0;
     for(int i = 0; i < size; ++i)
         res += sqr(output[i] - y[i]);
-    return res / size;
+    return res / 2;
 }
 
 void getInputLayer(float *inputLayer, FILE *f)
@@ -279,11 +274,11 @@ void getInputLayer(float *inputLayer, FILE *f)
             inputLayer[29 * i + j] = a[i][j] ? 0 : 1;
 }
 
-void makeStudyIteration(float *w[4], float *x[5], float &error)
+void makeStudyIteration(float *w[4], float *x[5], float &error, int n)
 {
-    RandomSampleReader reader(STUDYN, dataFileName, 10);
+    MNISTSampleReader reader("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte");
     
-    for(int i = 0; i < STUDYN * 10; ++i)
+    for(int i = 0; i < n; ++i)
     {
         int expectedDigit = reader.getNextSample(x[0]);
         
@@ -335,36 +330,34 @@ void initArrays(float *w[4], float *x[5], bool studying = 1)
     x[4] = new float[10];
 }
 
-void study()
+void study(int n)
 {
     float *w[4];
     float *x[5];
     
     initArrays(w, x);
     
-    float lastError = 1e20;
-    
+    float lastError = 0;
     int step = 1;
-    clock_t startTime = clock();
     
     for(;; ++step)
     {
-        //if(!(step % 30))
+        clock_t startTime = clock();
+        
+        //if(!(step % 20))
         //    ETA *= 0.3;
         
         float curError = 0;
         
-        makeStudyIteration(w, x, curError);
+        makeStudyIteration(w, x, curError, n);
         
-        if(fabs(curError - lastError) < EPS)
+        if(fabs(curError - lastError) < EPS || fabs(curError) < EPS)
             break;
         
         lastError = curError;
         
         cerr << "study step #" << step << " : error = " << curError <<
         ", time = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << endl;
-        
-        startTime = clock();
     }
     
     print("weight1", w[0], 156);
@@ -390,9 +383,10 @@ int getResult(float output[10])
     return res;
 }
 
-void test(const char *fileName, int expectedResult, int n)
+void test(int n)
 {
-	FILE *f = fopen(fileName, "rb");
+    MNISTSampleReader reader("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte");
+    
 	int rightResultCount = 0;
     
     float *w[4];
@@ -402,15 +396,17 @@ void test(const char *fileName, int expectedResult, int n)
 
 	for(int image = 0; image < n; ++image)
 	{
-        getInputLayer(x[0], f);
+
+        int expectedResult = reader.getNextSample(x[0]);
+
 		calculate(w, x);
+        
 		int result = getResult(x[4]);
         
 		if(result == expectedResult)
             ++rightResultCount;
     }
-	cerr << fileName << " : " << rightResultCount << endl;
-	fclose(f);
+	cerr << "testing : " << rightResultCount * 1. / n << endl;
 }
 
 int main()
@@ -419,13 +415,12 @@ int main()
 	cerr << fixed;
     
     //-----------
-    study();
+    study(4000);
     return 0;
     //------------
 
-	int n = 1000;
-    for(int i = 0; i < 10; ++i)
-        test(dataFileName[i], i, n);
+	int n = 2000;
+    test(n);
     
 	return 0;
 }
