@@ -1,8 +1,8 @@
 #include "util.h"
 
-const float EPS = 1e-7;
-float ETA = 0.002;
-//float ETA = 0.08;
+const float EPS = 3;
+float ETA = 0.001;
+//float ETA = 0.98;
 //---------------------------------------------------------------------------
 
 int k1[25] = {0, 1, 2, 3, 4,
@@ -176,7 +176,7 @@ void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
                 float curError = neuronError[1][169 * tmap + y * 13 + x];
                 
 				int ind = tmap * 26;
-                w[0][ind] += -ETA * curError; // bias
+                w[0][ind] += -ETA * curError;
                 ++ind;
                 
 				for(int i = 0; i < 25; ++i, ++ind)
@@ -194,7 +194,7 @@ void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
                 float curError = neuronError[2][25 * tmap + y * 5 + x];
                 
 				int ind = tmap * 156;
-				w[1][ind] += -ETA * curError; // bias
+				w[1][ind] += -ETA * curError;
                 ++ind;
                 
 				for(int i = 0; i < 25; ++i)
@@ -214,7 +214,7 @@ void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
         float curError = neuronError[3][tmap];
         
 		int ind = tmap * 1251;
-		w[2][ind] += -ETA * curError; // bias
+		w[2][ind] += -ETA * curError;
         ++ind;
         
 		for(int i = 0; i < 1250; ++i, ++ind)
@@ -226,7 +226,7 @@ void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
 		int ind = tmap * 101;
         float curError = neuronError[4][tmap];
         
-        w[3][ind] += -ETA * curError; // bias
+        w[3][ind] += -ETA * curError;
         ++ind;
         
 		for(int i = 0; i < 100; ++i, ++ind)
@@ -234,16 +234,8 @@ void calcNewWeights(float *w[4], float *neur[5], float *neuronError[5])
 	}
 }
 
-void backpropagate(float *w[4], float *x[5], float *y)
+void backpropagate(float *w[4], float *x[5], float *y, float *neuronError[5])
 {
-    float *neuronError[5];
-    
-    neuronError[0] = new float[841];
-    neuronError[1] = new float[1014];
-    neuronError[2] = new float[1250];
-    neuronError[3] = new float[100];
-    neuronError[4] = new float[10];
-    
     memset(neuronError[0], 0, sizeof(float) * 841);
     memset(neuronError[1], 0, sizeof(float) * 1014);
     memset(neuronError[2], 0, sizeof(float) * 1250);
@@ -262,19 +254,7 @@ float getNetError(float *output, int size, float *y)
     return res / 2;
 }
 
-void getInputLayer(float *inputLayer, FILE *f)
-{
-    uchar a[29][29];
-    memset(a, 0, sizeof a);
-    for(int i = 0; i < 28; ++i)
-        fread(&a[i], sizeof(uchar), 28, f);
-    
-    for(int i = 0; i < 29; ++i)
-        for(int j = 0; j < 29; ++j)
-            inputLayer[29 * i + j] = a[i][j] ? 0 : 1;
-}
-
-void makeStudyIteration(float *w[4], float *x[5], float &error, int n)
+void makeTrainIteration(float *w[4], float *x[5], float &error, int n, float *neuronError[5])
 {
     MNISTSampleReader reader("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte");
     
@@ -285,13 +265,13 @@ void makeStudyIteration(float *w[4], float *x[5], float &error, int n)
         float y[10];
         for(int i = 0; i < 10; ++i)
             y[i] = i == expectedDigit ? 0.95 : -0.95;
-            //y[i] = i == expectedDigit ? 0.95 : 0.05;
+            //y[i] = i == expectedDigit ? 0.98 : 0.02;
 
         calculate(w, x);
         
         error += getNetError(x[4], 10, y);
         
-        backpropagate(w, x, y);
+        backpropagate(w, x, y, neuronError);
     }
 }
 
@@ -301,19 +281,31 @@ void initWeights(float *w, int n)
         w[i] = (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 100;
 }
 
-void initArrays(float *w[4], float *x[5], bool studying = 1)
+void initArrays(float *w[4], float *x[5], bool training = 1, float *neuronError[5] = NULL)
 {
     w[0] = new float[156];
     w[1] = new float[7800];
     w[2] = new float[125100];
     w[3] = new float[1010];
     
-    if(studying)
+    x[0] = new float[841];
+    x[1] = new float[1014];
+    x[2] = new float[1250];
+    x[3] = new float[100];
+    x[4] = new float[10];
+    
+    if(training)
     {
         initWeights(w[0], 156);
         initWeights(w[1], 7800);
         initWeights(w[2], 125100);
         initWeights(w[3], 1010);
+        
+        neuronError[0] = new float[841];
+        neuronError[1] = new float[1014];
+        neuronError[2] = new float[1250];
+        neuronError[3] = new float[100];
+        neuronError[4] = new float[10];
     }
     else
     {
@@ -322,20 +314,34 @@ void initArrays(float *w[4], float *x[5], bool studying = 1)
         read("weights/weight3", w[2], 125100);
         read("weights/weight4", w[3], 1010);
     }
-    
-    x[0] = new float[841];
-    x[1] = new float[1014];
-    x[2] = new float[1250];
-    x[3] = new float[100];
-    x[4] = new float[10];
 }
 
-void study(int n)
+void printWeights(float *w[4])
+{
+    print("weights/weight1", w[0], 156);
+    print("weights/weight2", w[1], 7800);
+    print("weights/weight3", w[2], 125100);
+    print("weights/weight4", w[3], 1010);
+}
+
+void freeMemory(float *w[4], float *x[5], float *neuronError[5])
+{
+    for(int i = 0; i < 5; ++i)
+    {
+        delete[] neuronError[i];
+        delete[] x[i];
+        if(i < 4)
+            delete[] w[i];
+    }
+}
+
+void train(int n)
 {
     float *w[4];
     float *x[5];
+    float *neuronError[5];
     
-    initArrays(w, x);
+    initArrays(w, x, 1, neuronError);
     
     float lastError = 0;
     int step = 1;
@@ -344,26 +350,28 @@ void study(int n)
     {
         clock_t startTime = clock();
         
-        //if(!(step % 20))
-        //    ETA *= 0.3;
-        
         float curError = 0;
         
-        makeStudyIteration(w, x, curError, n);
+        makeTrainIteration(w, x, curError, n, neuronError);
         
+        if(!(step % 50) && step)
+        {
+            printWeights(w);
+            //ETA *= 0.5;
+        }
+        
+        cerr << "training step #" << step << " : error = " << curError <<
+            ", time = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << endl;
+
         if(fabs(curError - lastError) < EPS || fabs(curError) < EPS)
             break;
         
         lastError = curError;
-        
-        cerr << "study step #" << step << " : error = " << curError <<
-        ", time = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << endl;
     }
     
-    print("weight1", w[0], 156);
-    print("weight2", w[1], 7800);
-    print("weight3", w[2], 125100);
-    print("weight4", w[3], 1010);
+    printWeights(w);
+    
+    freeMemory(w, x, neuronError);
 }
 
 //---------------------------------------------------------------------------
@@ -409,18 +417,26 @@ void test(int n)
 	cerr << "testing : " << rightResultCount * 1. / n << endl;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     cerr.precision(9);
 	cerr << fixed;
-    
-    //-----------
-    study(4000);
-    return 0;
-    //------------
 
-	int n = 2000;
-    test(n);
-    
+    if(argc == 1)
+    {
+        cerr << "need one parameter: 1 - for training, 0 - for testing" << endl;
+        return 0;
+    }
+
+    if(!atoi(argv[1]))
+    {
+        int n = 1000;
+        test(n);
+    }
+    else
+    {
+        train(4000);
+    }
+
 	return 0;
 }
