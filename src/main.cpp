@@ -5,18 +5,6 @@ float ETA = 0.004;
 //float ETA = 0.98;
 //---------------------------------------------------------------------------
 
-int k1[25] = {0, 1, 2, 3, 4,
-    29, 30, 31, 32, 33,
-    58, 59, 60, 61, 62,
-    87, 88, 89, 90, 91,
-    116, 117, 118, 119, 120};
-
-int k2[25] = {0, 1, 2, 3, 4,
-    13, 14, 15, 16, 17,
-    26, 27, 28, 29, 30,
-    39, 40, 41, 42, 43,
-    52, 53, 54, 55, 56};
-
 float f(float s)
 {
     return 1.7159 * tanhf(0.66666667 * s);
@@ -335,47 +323,7 @@ void freeMemory(float *w[4], float *x[5], float *neuronError[5])
     }
 }
 
-void train(int n)
-{
-    float *w[4];
-    float *x[5];
-    float *neuronError[5];
-    
-    initArrays(w, x, 1, neuronError);
-    
-    float lastError = 0;
-    int step = 1;
-    
-    for(;; ++step)
-    {
-        clock_t startTime = clock();
-        
-        float curError = 0;
-        
-        makeTrainIteration(w, x, curError, n, neuronError);
-        
-        if(!(step % 50) && step)
-        {
-            printWeights(w);
-            //ETA *= 0.5;
-        }
-        
-        cerr << "training step #" << step << " : error = " << curError <<
-            ", time = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << endl;
-
-        if(fabs(curError - lastError) < EPS || fabs(curError) < EPS)
-            break;
-        
-        lastError = curError;
-    }
-    
-    printWeights(w);
-    
-    freeMemory(w, x, neuronError);
-}
-
-//---------------------------------------------------------------------------
-
+//==============================================================================
 int getResult(float output[10])
 {
     float maxi = -1.0;
@@ -416,6 +364,52 @@ void test(int n)
     }
 	cerr << "testing : " << rightResultCount * 1. / n << endl;
 }
+//==============================================================================
+
+void train(int n)
+{
+    float *w[4];
+    float *x[5];
+    float *neuronError[5];
+    
+    initArrays(w, x, 1, neuronError);
+    
+    float lastError = 0;
+    int step = 1;
+    
+    for(;; ++step)
+    {
+        clock_t startTime = clock();
+        
+        float curError = 0;
+        
+        makeTrainIteration(w, x, curError, n, neuronError);
+        
+        // if(!(step % 50) && step)
+        // {
+        //     printWeights(w);
+        //     //ETA *= 0.5;
+        // }
+
+        printWeights(w);
+
+        cerr << "training step #" << step << " : error = " << curError <<
+            ", time = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << "\n\t\t";
+
+        test(n / 4);
+
+        if(fabs(curError - lastError) < EPS || fabs(curError) < EPS)
+            break;
+        
+        lastError = curError;
+    }
+    
+    printWeights(w);
+    
+    freeMemory(w, x, neuronError);
+}
+
+//---------------------------------------------------------------------------
 
 int main(int argc, char *argv[])
 {
