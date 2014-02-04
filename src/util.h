@@ -1,10 +1,12 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <sstream>
 #include <cmath>
 #include <ctime>
 #include <iostream>
 #include <vector>
+#include <string>
 
 template<class T> T sqr(T a) { return a * a; }
 
@@ -48,14 +50,14 @@ public:
     
     int getNextSample(float *inputLayer)
     {
-        uchar a[29][29];
+        uchar a[28][28];
         memset(a, 0, sizeof a);
         for(int i = 0; i < 28; ++i)
             fread(&a[i], sizeof(uchar), 28, imagesFile);
         
-        for(int i = 0; i < 29; ++i)
-            for(int j = 0; j < 29; ++j)
-                inputLayer[29 * i + j] = a[i][j] ? 0 : 1;
+        for(int i = 0; i < 28; ++i)
+            for(int j = 0; j < 28; ++j)
+                inputLayer[28 * i + j] = a[i][j] ? 0 : 1;
         
         uchar label;
         fread(&label, sizeof(uchar), 1, labelsFile);
