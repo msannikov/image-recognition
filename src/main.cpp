@@ -238,6 +238,7 @@ void test(int n)
 		if(result == expectedResult)
             ++rightResultCount;
     }
+
 	cerr << "testing : " << rightResultCount * 1. / n << endl;
 }
 
@@ -280,24 +281,203 @@ void train(int n)
     
     printWeights(w, bias);
 }
+//===============================================================
+
+const int MAXPOP = 100; // max size of population
+const int geneSize = 39760;
+
+struct gene 
+{
+    float *alleles;
+    float fitness;
+    float accuracy; // testing
+
+    gene()
+    {
+        alleles = new float[geneSize];
+    }
+
+    ~gene()
+    {
+        //delete[] alleles; // why does not it work? 
+    }
+
+    bool operator == (gene &gn) 
+    {
+        for (int i = 0; i < geneSize; i++)
+            if (gn.alleles[i] != alleles[i])
+            	return 0;
+        return 1;
+    }
+
+    bool operator < (const gene &g) const
+    {
+    	return fitness < g.fitness;
+    }
+};
+
+class GenAlgTrainer
+{
+    public:
+    	int sampleSize;
+        GenAlgTrainer(int sampleSize);
+        void train(int epochCount);
+        gene getGene(int i) { return population[i]; }
+        void calcFitness(gene &g);
+        void crossover(gene &g1, gene &g2, vector<gene> &genes);
+        float getRandVal();
+    protected:
+        gene population[MAXPOP];
+};
+
+float GenAlgTrainer::getRandVal()
+{
+	return (rand() * 1. / RAND_MAX) * ((rand() & 1) ? 1 : -1) / 100;
+}
+
+GenAlgTrainer::GenAlgTrainer(int sampleSize)
+{
+	this->sampleSize = sampleSize;
+
+    for(int i = 0; i < MAXPOP; ++i)
+    {
+        for(int j = 0; j < geneSize; ++j)
+            population[i].alleles[j] = getRandVal();
+        calcFitness(population[i]);
+    }
+}
+
+void GenAlgTrainer::crossover(gene &g1, gene &g2, vector<gene> &genes)
+{
+	int ind = rand() % (geneSize + 1);
+
+	gene r1, r2;
+
+	for(int i = 0; i < geneSize; ++i)
+	{
+		r1.alleles[i] = i < ind ? g1.alleles[i] : g2.alleles[i];
+		r2.alleles[i] = i >= ind ? g1.alleles[i] : g2.alleles[i];
+	}
+
+	calcFitness(r1);
+	calcFitness(r2);
+
+	genes.pb(r1);
+	genes.pb(r2);
+}
+
+void GenAlgTrainer::train(int epochCount)
+{
+	for(int epoch = 0; epoch < epochCount; ++epoch)
+	{
+		vector<gene> genes(MAXPOP);
+		for(int i = 0; i < MAXPOP; ++i)
+			genes[i] = getGene(i);
+
+		sort(all(genes));
+
+		cerr << "epoch = " << epoch << endl;
+		for(int i = 0; i < min(10, MAXPOP); ++i)
+			cerr << "error = " << genes[i].fitness << "\t"
+				<< "accuracy = " << genes[i].accuracy << endl;
+		cerr << "------------------------" << endl;
+
+		for(int i = 0; i < MAXPOP / 2; ++i)
+		{
+			int ind1 = rand() % sz(genes);
+			int ind2 = rand() % sz(genes);
+
+			crossover(genes[ind1], genes[ind2], genes);
+		}	
+
+		for(int i = 0; i < MAXPOP; ++i)
+		{
+			int ind = rand() % sz(genes);
+			int allele = rand() % geneSize;
+			float newVal = rand() * 1. / RAND_MAX * 2 - 1;
+			genes[ind].alleles[allele] = newVal;
+		}
+
+		sort(all(genes));
+
+		genes.resize(MAXPOP);
+
+		for(int i = 0; i < MAXPOP; ++i)
+			population[i] = genes[i]; 
+	}
+}
+
+void GenAlgTrainer::calcFitness(gene &g)
+{
+	float **w[2];
+	float *bias[2];
+
+    float *x[3];
+    float *neuronError[3];
+
+    initArrays(w, bias, x, 1, neuronError);
+
+	int ind = 0;
+	
+	for(int i = 0; i < 784; ++i)
+		for(int j = 0; j < 50; ++j)
+    		w[0][i][j] = g.alleles[ind++];
+
+	for(int i = 0; i < 50; ++i)
+		for(int j = 0; j < 10; ++j)
+    		w[1][i][j] = g.alleles[ind++];	
+
+    for(int i = 0; i < 50; ++i)
+    	bias[0][i] = g.alleles[ind++];
+
+    for(int i = 0; i < 10; ++i)
+    	bias[1][i] = g.alleles[ind++];
+
+    MNISTSampleReader reader("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte");
+   	
+   	float error = 0;
+
+   	int correctAnsCount = 0;
+
+    for(int i = 0; i < sampleSize; ++i)
+    {
+        int expectedDigit = reader.getNextSample(x[0]);
+        
+        float y[10];
+        for(int j = 0; j < 10; ++j)
+            y[j] = j == expectedDigit ? 0.95 : -0.95;
+
+        calculate(w, bias, x);
+        
+        error += getNetError(x[2], 10, y);
+
+		correctAnsCount += getResult(x[2]) == expectedDigit;        
+    }
+
+    g.fitness = error;
+    g.accuracy = correctAnsCount * 1. / sampleSize;
+}
 
 int main(int argc, char *argv[])
 {
     cerr.precision(9);
 	cerr << fixed;
 
-    if(argc == 1)
-    {
-        cerr << "need one parameter: 1 - for training, 0 - for testing" << endl;
-        return 0;
-    }
+	GenAlgTrainer genAlgTrainer(4000);
+	genAlgTrainer.train(100000);
 
-    int n = 4000;
+    // if(argc == 1)
+    // {
+    //     cerr << "need one parameter: 1 - for training, 0 - for testing" << endl;
+    //     return 0;
+    // }
 
-    if(!atoi(argv[1]))
-        test(n >> 2);
-    else
-        train(n);
+    // int n = 4000;
+
+    // if(!atoi(argv[1]))
+    //     test(n >> 2);
+    // else
+    //     train(n);
 
 	return 0;
 }

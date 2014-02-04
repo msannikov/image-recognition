@@ -5,12 +5,18 @@
 #include <cmath>
 #include <ctime>
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <string>
 
 template<class T> T sqr(T a) { return a * a; }
 
 typedef unsigned char uchar;
+
+#define all(C) (C).begin(), (C).end()
+#define sz(C) (int)(C).size()
+#define pb push_back
+
 using namespace std;
 
 void print(const char *fileName, float *a, int n)
