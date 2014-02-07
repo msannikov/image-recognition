@@ -158,6 +158,28 @@ void printWeights(float **w[2], float *bias[2])
 	print("weights/b1", bias[1], 10);
 }
 
+void freeMemory(float **w[4], float*bias[2], float *x[3], float *neuronError[3] = NULL)
+{
+	for(int i = 0; i < 784; ++i)
+		delete[] w[0][i];
+
+	for(int i = 0; i < 50; ++i)
+		delete[] w[1][i];
+
+	delete[] w[0];
+	delete[] w[1];
+
+	delete[] bias[0];
+	delete[] bias[1];
+
+    for(int i = 0; i < 3; ++i)
+    {
+        if(neuronError)
+			delete[] neuronError[i];
+        delete[] x[i];
+    }
+}
+
 void initArrays(float **w[2], float *bias[2], float *x[3], 
 	int training = 1, float *neuronError[3] = NULL)
 {
@@ -240,6 +262,8 @@ void test(int n)
 	}
 
 	cerr << "testing : " << rightResultCount * 1. / n << endl;
+
+	freeMemory(w, bias, x);
 }
 
 void train(int n)
@@ -282,6 +306,8 @@ void train(int n)
 	}
 	
 	printWeights(w, bias);
+
+	freeMemory(w, bias, x, neuronError);
 }
 
 //===============================================================
@@ -289,37 +315,32 @@ void train(int n)
 //===============================================================
 
 const int MAXPOP = 150; // max size of population
-const int geneSize = 39760;
+const int chromSize = 39760;  /// !!!! remove all constants
 
-struct gene 
+struct chrom 
 {
-	float *alleles;
-	float fitness;
+	const static float EPS = 10e-5;
+
+	vector<float> genes;
+	float fitness;  // == error while trainig
 	float accuracy; // testing
 
-	const static bool EPS = 10e-3;
-
-	gene()
+	chrom()
 	{
-		alleles = new float[geneSize];
+		genes.resize(chromSize);
 	}
 
-	~gene()
+	bool operator == (chrom &c)
 	{
-		//delete[] alleles; // why it does not work? 
-	}
-
-	bool operator == (gene &g) 
-	{
-		for (int i = 0; i < geneSize; i++)
-			if (fabs(g.alleles[i] - alleles[i]) > EPS)
+		for (int i = 0; i < chromSize; i++)
+			if (fabs(c.genes[i] - genes[i]) > EPS)
 				return 0;
 		return 1;
 	}
 
-	bool operator < (const gene &g) const
+	bool operator < (const chrom &c) const
 	{
-		return fitness < g.fitness;
+		return fitness < c.fitness;
 	}
 };
 
@@ -330,11 +351,10 @@ class GenAlgTrainer
 
 		int sampleSize;
 		void train(int epochCount);
-		gene getGene(int i) { return population[i]; }
-		void calcFitness(gene &g);
-		void crossover(gene &g1, gene &g2, vector<gene> &genes);
+		void calcFitness(chrom &c);
+		void crossover(chrom &c1, chrom &c2);
 		float getRandVal();
-		gene population[MAXPOP];
+		vector<chrom> chroms; // population of chromosoms
 };
 
 float GenAlgTrainer::getRandVal()
@@ -344,6 +364,8 @@ float GenAlgTrainer::getRandVal()
 
 GenAlgTrainer::GenAlgTrainer(int sampleSize, bool readFromFile)
 {
+	chroms.resize(MAXPOP);
+
 	this->sampleSize = sampleSize;
 
 	if(readFromFile)
@@ -356,66 +378,76 @@ GenAlgTrainer::GenAlgTrainer(int sampleSize, bool readFromFile)
 		initArrays(w, bias, x, 1, neuronError);
 		initArrays(w, bias, x, 0);
 
-		for(int popInd = 0; popInd < MAXPOP; ++popInd)
+		for(int chromInd = 0; chromInd < MAXPOP; ++chromInd)
 		{
 			int ind = 0;
 
 			for(int i = 0; i < 784; ++i)
 				for(int j = 0; j < 50; ++j)
-					population[popInd].alleles[ind++] = w[0][i][j];
+					chroms[chromInd].genes[ind++] = w[0][i][j];
 
 			for(int i = 0; i < 50; ++i)
 				for(int j = 0; j < 10; ++j)
-					population[popInd].alleles[ind++] = w[1][i][j];	
+					chroms[chromInd].genes[ind++] = w[1][i][j];	
 
 			for(int i = 0; i < 50; ++i)
-				population[popInd].alleles[ind++] = bias[0][i];
+				chroms[chromInd].genes[ind++] = bias[0][i];
 
 			for(int i = 0; i < 10; ++i)
-				population[popInd].alleles[ind++] = bias[1][i];	
+				chroms[chromInd].genes[ind++] = bias[1][i];	
 
 			float curError;
 
 			makeTrainIteration(w, bias, x, curError, sampleSize, neuronError);
 
-			calcFitness(population[popInd]); // refactor this
+			calcFitness(chroms[chromInd]); // refactor this
 		}
+
+		freeMemory(w, bias, x, neuronError);
 	}
 	else
 	{
 		for(int i = 0; i < MAXPOP; ++i)
 		{
-			for(int j = 0; j < geneSize; ++j)
-				population[i].alleles[j] = getRandVal();
-			calcFitness(population[i]);
+			for(int j = 0; j < chromSize; ++j)
+				chroms[i].genes[j] = getRandVal();
+			calcFitness(chroms[i]);
 		}
 	}
 }
 
-void GenAlgTrainer::crossover(gene &g1, gene &g2, vector<gene> &genes)
+void GenAlgTrainer::crossover(chrom &c1, chrom &c2)
 {
-	int ind = rand() % (geneSize + 1);
+	int ind = rand() % (chromSize + 1);
 
-	gene r1, r2;
+	chrom r1, r2;
 
-	for(int i = 0; i < geneSize; ++i)
+	for(int i = 0; i < chromSize; ++i)
 	{
-		r1.alleles[i] = i < ind ? g1.alleles[i] : g2.alleles[i];
-		r2.alleles[i] = i >= ind ? g1.alleles[i] : g2.alleles[i];
+		r1.genes[i] = i < ind ? c1.genes[i] : c2.genes[i];
+		r2.genes[i] = i >= ind ? c1.genes[i] : c2.genes[i];
 	}
 
 	if(r1 == r2)
 	{
-		int ind = rand() % geneSize;
+		int ind = rand() % chromSize;
 		float val = rand() * 2. / RAND_MAX - 1;
-		r1.alleles[ind] = val;
+		r1.genes[ind] = val;
 	}
 
 	calcFitness(r1);
 	calcFitness(r2);
 
-	genes.pb(r1);
-	genes.pb(r2);
+	chroms.pb(r1); 
+	chroms.pb(r2);
+} 
+
+bool operator == (const chrom &l, const chrom &r)  /// why?
+{
+	for (int i = 0; i < chromSize; i++)
+		if (fabs(l.genes[i] - r.genes[i]) > 10e-3)
+			return 0;
+	return 1; 
 }
 
 void GenAlgTrainer::train(int epochCount)
@@ -424,42 +456,38 @@ void GenAlgTrainer::train(int epochCount)
 	{
 		clock_t startTime = clock();
 
-		vector<gene> genes(MAXPOP);
-		for(int i = 0; i < MAXPOP; ++i)
-			genes[i] = getGene(i);
-
-		sort(all(genes));
+		sort(all(chroms));
+		chroms.erase(unique(all(chroms)), chroms.end());
 
 		cerr << "epoch = " << epoch << endl;
-		for(int i = 0; i < min(5, MAXPOP); ++i)
-			cerr << "error = " << genes[i].fitness << "\t"
-				<< "accuracy = " << genes[i].accuracy << endl;
+		for(int i = 0; i < min(5, sz(chroms)); ++i)
+			cerr << "error = " << chroms[i].fitness << "\t"
+				<< "accuracy = " << chroms[i].accuracy << endl;
 		
-
-		for(int i = 0; i < MAXPOP - 1; i += 2)
-			crossover(genes[i], genes[i + 1], genes);
+		int size = sz(chroms);
+		for(int i = 0; i < size - 1; i += 2)
+			crossover(chroms[i], chroms[i + 1]);
 
 		for(int i = 0; i < MAXPOP; ++i)
 		{
-			int ind = rand() % sz(genes);
-			int allele = rand() % geneSize;
-			float newVal = rand() * 2. / RAND_MAX - 1;
-			genes[ind].alleles[allele] = newVal;
+			int chromInd = rand() % sz(chroms);
+			int geneInd = rand() % chromSize;
+			float geneVal = rand() * 2. / RAND_MAX - 1;
+			chroms[chromInd].genes[geneInd] = geneVal;
 		}
 
-		sort(all(genes));
+		sort(all(chroms));
+		chroms.erase(unique(all(chroms)), chroms.end());
 
-		genes.resize(MAXPOP);
-
-		for(int i = 0; i < MAXPOP; ++i)
-			population[i] = genes[i]; 
+		if(sz(chroms) > MAXPOP)
+			chroms.resize(MAXPOP);
 
 		cerr << "\ttime = " << double(clock() - startTime) / CLOCKS_PER_SEC << "s" << "\n";
 		cerr << "------------------------" << endl;
 	}
 }
 
-void GenAlgTrainer::calcFitness(gene &g)
+void GenAlgTrainer::calcFitness(chrom &c)
 {
 	float **w[2];
 	float *bias[2];
@@ -473,17 +501,17 @@ void GenAlgTrainer::calcFitness(gene &g)
 	
 	for(int i = 0; i < 784; ++i)
 		for(int j = 0; j < 50; ++j)
-			w[0][i][j] = g.alleles[ind++];
+			w[0][i][j] = c.genes[ind++];
 
 	for(int i = 0; i < 50; ++i)
 		for(int j = 0; j < 10; ++j)
-			w[1][i][j] = g.alleles[ind++];	
+			w[1][i][j] = c.genes[ind++];	
 
 	for(int i = 0; i < 50; ++i)
-		bias[0][i] = g.alleles[ind++];
+		bias[0][i] = c.genes[ind++];
 
 	for(int i = 0; i < 10; ++i)
-		bias[1][i] = g.alleles[ind++];
+		bias[1][i] = c.genes[ind++];
 
 	MNISTSampleReader reader("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte");
 	
@@ -502,7 +530,7 @@ void GenAlgTrainer::calcFitness(gene &g)
 		error += getNetError(x[2], 10, y);
 	}
 
-	g.fitness = error;
+	c.fitness = error;
 	//-----------------------
 
 	MNISTSampleReader testReader = MNISTSampleReader("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte");
@@ -521,7 +549,9 @@ void GenAlgTrainer::calcFitness(gene &g)
 			++rightResultCount;
 	}
 
-	g.accuracy = rightResultCount * 1. / sampleSize * 4;
+	c.accuracy = rightResultCount * 1. / sampleSize * 4;
+
+	freeMemory(w, bias, x, neuronError);
 }
 
 void mixedTraining(int sampleSize)
@@ -541,6 +571,7 @@ int main(int argc, char *argv[])
 	cerr << fixed;
 
 	mixedTraining(4000);
-
+	// mixedTraining(100); 
+	
 	return 0;
 }
